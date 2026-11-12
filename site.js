@@ -105,12 +105,13 @@
     const sessionId = (params.get("session_id") || "").trim();
     const canceled = params.get("canceled") === "1";
     const apiBase = (cfg.workerApiBase || "").replace(/\/$/, "");
+    const priceLabel = cfg.priceDisplay || "$2";
 
     if (canceled) {
       gateTag.textContent = "Checkout Canceled";
       gateTitle.textContent = "No Charge Was Made";
       gateDesc.textContent =
-        "Your Stripe Checkout session was canceled before payment. You can read the complete essay free below or start a new screening checkout when ready.";
+        "Your Stripe Checkout session was canceled before payment. You can read the complete essay free or start a new $2 screening checkout when ready.";
       statusBanner.textContent = "Checkout canceled — entitlement not granted.";
     }
 
@@ -143,32 +144,53 @@
       }
     }
 
-    // Handle Pending vs. Active Checkout configuration cleanly
-    if (!cfg.checkoutEnabled || !apiBase) {
+    // Probe live Worker `/api/status` so live Stripe activation flips Checkout ON immediately
+    let serverCheckoutReady = Boolean(cfg.checkoutEnabled);
+    let serverMode = cfg.mode || "live_pending";
+    if (apiBase) {
+      try {
+        const stRes = await fetch(`${apiBase}/api/status`);
+        if (stRes.ok) {
+          const stData = await stRes.json();
+          if (typeof stData.checkout_ready === "boolean") {
+            serverCheckoutReady = stData.checkout_ready;
+          }
+          if (stData.mode) serverMode = stData.mode;
+        }
+      } catch {
+        // Keep static fallback if offline
+      }
+    }
+
+    if (!serverCheckoutReady || !apiBase) {
       if (!canceled) {
-        gateTag.textContent = "Screening Status · Pending Live Pricing";
-        gateTitle.textContent = "Player Ready · Checkout Opens Soon";
+        gateTag.textContent = `Screening Pass · ${priceLabel} USD`;
+        gateTitle.textContent = `Digital Screening Pass — ${priceLabel}`;
         gateDesc.textContent =
           cfg.pendingMessage ||
-          "Private video hosting and Stripe webhook verification are configured; live ticket checkout awaits final price & currency activation.";
+          "Private 1080p video hosting and signed Cloudflare playback are live; hosted $2.00 USD Stripe Checkout activates once Stripe 2FA sign-in completes.";
         statusBanner.textContent =
-          "Mode: Live Pending (zero live charges enabled until final Stripe price & currency are confirmed).";
+          "Private 1080p hosting & Cloudflare Worker live · $2.00 USD Checkout awaiting Stripe 2FA key binding (zero charges active).";
       }
-      checkoutBtn.textContent = "Checkout Pending Final Price";
+      checkoutBtn.textContent = `Watch the Film — ${priceLabel} (Activating Stripe)`;
       checkoutBtn.disabled = true;
       checkoutBtn.style.opacity = "0.65";
       checkoutBtn.style.cursor = "not-allowed";
       return;
     }
 
+    checkoutBtn.disabled = false;
+    checkoutBtn.style.opacity = "1";
+    checkoutBtn.style.cursor = "pointer";
+    checkoutBtn.textContent = `Watch the Film — ${priceLabel}`;
     statusBanner.textContent =
-      cfg.mode === "preview_test"
-        ? "Mode: Stripe Test-Mode Hosted Checkout (no real card charges)."
-        : "Hosted Stripe Checkout ready.";
+      serverMode === "preview_test" || serverMode === "test"
+        ? `Mode: Stripe Test-Mode Hosted Checkout (${priceLabel} USD — no real card charges).`
+        : `Hosted Stripe Checkout ready (${priceLabel}.00 USD Screening Pass).`;
 
     checkoutBtn.addEventListener("click", async () => {
       checkoutBtn.disabled = true;
-      statusBanner.textContent = "Creating hosted Stripe Checkout session…";
+      statusBanner.textContent = `Opening hosted ${priceLabel} Stripe Checkout…`;
       try {
         const res = await fetch(`${apiBase}/api/checkout`, { method: "POST" });
         const data = await res.json();

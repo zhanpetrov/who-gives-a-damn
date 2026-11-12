@@ -1,14 +1,15 @@
 /**
  * Cloudflare Worker: Private Screening Paywall & Signed Video Streamer
- * Film: "WHO GIVES A DAMN?" by Zhan Petrov
+ * Film: "WHO GIVES A DAMN?" by Zhan Petrov ($2.00 USD Screening Pass)
  *
  * Security guarantees:
  * - Zero secrets, Stripe keys, or private video URLs ever appear in client code or logs.
- * - Hosted Stripe Checkout only (`POST /api/checkout`).
+ * - `run_worker_first = true` ensures private video chunks are NEVER directly reachable.
+ * - Hosted Stripe Checkout only (`POST /api/checkout`) at $2.00 USD (200 cents) or designated STRIPE_PRICE_ID.
  * - Cryptographic `Stripe-Signature` (HMAC-SHA256 + 300s replay window) verification (`POST /api/webhook`).
  * - Strictly idempotent fulfillment keyed by Stripe `event.id` and `session.id` only after `payment_status === "paid"`.
  * - Server-enforced entitlement check (`GET /api/access`) issuing 300-second HMAC-signed `/api/stream` URLs.
- * - Private R2 video Range streaming (`GET /api/stream`) with `Cache-Control: private, no-store`.
+ * - Private video Range streaming (`GET|HEAD /api/stream`) with `Cache-Control: private, no-store`.
  */
 
 const enc = new TextEncoder();
@@ -67,8 +68,9 @@ function corsHeaders(env, origin) {
   const allowOrigin = allowed === "*" ? "*" : origin === allowed ? origin : allowed;
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Range",
+    "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
     "Cache-Control": "no-store",
   };
 }
@@ -92,7 +94,7 @@ function parseRange(rangeHeader, totalSize) {
   if (Number.isNaN(start) || Number.isNaN(end) || start < 0 || start > end || start >= totalSize) {
     return null;
   }
-  return { offset: start, length: end - start + 1, end };
+  return { offset: start, length: end - start + 1, end, explicitEnd: Boolean(endStr) };
 }
 
 export default {
@@ -107,13 +109,22 @@ export default {
 
     // 1. Public configuration status check (never exposes keys or media URLs)
     if (url.pathname === "/api/status" && request.method === "GET") {
+      const unitAmount = Number(env.STRIPE_UNIT_AMOUNT || 200);
+      const currency = (env.STRIPE_CURRENCY || "usd").toLowerCase();
+      const priceDisplay = env.STRIPE_DISPLAY_PRICE || "$2";
       const checkoutReady =
-        env.CHECKOUT_ENABLED === "true" && Boolean(env.STRIPE_SECRET_KEY) && Boolean(env.STRIPE_PRICE_ID);
-      const privateHostingReady = Boolean(env.FILM_BUCKET) && Boolean(env.PLAYBACK_SIGNING_SECRET);
+        env.CHECKOUT_ENABLED === "true" &&
+        Boolean(env.STRIPE_SECRET_KEY) &&
+        Boolean(env.STRIPE_PRICE_ID || unitAmount > 0);
+      const privateHostingReady =
+        (Boolean(env.FILM_BUCKET) || Boolean(env.PRIVATE_ASSETS)) && Boolean(env.PLAYBACK_SIGNING_SECRET);
       return jsonResp(
         {
           film: "who-gives-a-damn",
           mode: env.STRIPE_MODE || "pending",
+          price_display: priceDisplay,
+          currency,
+          unit_amount: unitAmount,
           checkout_ready: checkoutReady,
           private_hosting_ready: privateHostingReady,
         },
@@ -122,13 +133,16 @@ export default {
       );
     }
 
-    // 2. Create Hosted Stripe Checkout Session
+    // 2. Create Hosted Stripe Checkout Session ($2.00 USD / 200 cents)
     if (url.pathname === "/api/checkout" && request.method === "POST") {
-      if (env.CHECKOUT_ENABLED !== "true" || !env.STRIPE_SECRET_KEY || !env.STRIPE_PRICE_ID) {
+      const unitAmount = String(env.STRIPE_UNIT_AMOUNT || "200");
+      const currency = (env.STRIPE_CURRENCY || "usd").toLowerCase();
+      if (env.CHECKOUT_ENABLED !== "true" || !env.STRIPE_SECRET_KEY) {
         return jsonResp(
           {
             status: "checkout_pending",
-            error: "Paid screening checkout is paused pending Stripe price and currency confirmation.",
+            price_display: env.STRIPE_DISPLAY_PRICE || "$2",
+            error: "Screening pass is set to $2.00 USD; awaiting Stripe 2FA key binding to enable live card checkout.",
           },
           503,
           cors
@@ -141,11 +155,22 @@ export default {
       );
       const params = new URLSearchParams();
       params.set("mode", "payment");
-      params.set("line_items[0][price]", env.STRIPE_PRICE_ID);
+      if (env.STRIPE_PRICE_ID) {
+        params.set("line_items[0][price]", env.STRIPE_PRICE_ID);
+      } else {
+        params.set("line_items[0][price_data][currency]", currency);
+        params.set("line_items[0][price_data][unit_amount]", unitAmount);
+        params.set("line_items[0][price_data][product_data][name]", "WHO GIVES A DAMN? — Digital Screening Pass");
+        params.set(
+          "line_items[0][price_data][product_data][description]",
+          "Private 1080p HD stream with synchronized English captions (05:00, 24 fps)."
+        );
+      }
       params.set("line_items[0][quantity]", "1");
       params.set("success_url", `${siteBase}/watch.html?session_id={CHECKOUT_SESSION_ID}`);
       params.set("cancel_url", `${siteBase}/watch.html?canceled=1`);
       params.set("metadata[film_slug]", "who-gives-a-damn");
+      params.set("metadata[price_cents]", unitAmount);
 
       const stripeApiBase = env.STRIPE_API_BASE || "https://api.stripe.com";
       const resp = await fetch(`${stripeApiBase}/v1/checkout/sessions`, {
@@ -199,6 +224,8 @@ export default {
             session_id: sessionObj.id,
             film: "who-gives-a-damn",
             paid: true,
+            amount_total: sessionObj.amount_total ?? 200,
+            currency: sessionObj.currency ?? "usd",
             fulfilled_at: new Date().toISOString(),
             fulfillment_count: 1,
           };
@@ -228,7 +255,8 @@ export default {
         return jsonResp({ authorized: false, error: "Payment not settled." }, 403, cors);
       }
 
-      if (!env.FILM_BUCKET || !env.PLAYBACK_SIGNING_SECRET) {
+      const hasStorage = Boolean(env.FILM_BUCKET) || Boolean(env.PRIVATE_ASSETS);
+      if (!hasStorage || !env.PLAYBACK_SIGNING_SECRET) {
         return jsonResp({ authorized: true, stream_pending: true }, 200, cors);
       }
 
@@ -250,8 +278,8 @@ export default {
       );
     }
 
-    // 5. Short-Lived HMAC-Signed Private R2 Video Streamer (supports HTTP 206 Range scrubbing)
-    if (url.pathname === "/api/stream" && request.method === "GET") {
+    // 5. Short-Lived HMAC-Signed Private Video Streamer (supports HEAD + HTTP 206 Range scrubbing)
+    if (url.pathname === "/api/stream" && (request.method === "GET" || request.method === "HEAD")) {
       const sid = url.searchParams.get("sid") || "";
       const expStr = url.searchParams.get("exp") || "";
       const sig = url.searchParams.get("sig") || "";
@@ -276,44 +304,137 @@ export default {
         return jsonResp({ error: "Entitlement revoked or missing." }, 403, cors);
       }
 
-      const objectKey = env.PRIVATE_VIDEO_KEY || "who-gives-a-damn-master.mp4";
-      const head = await env.FILM_BUCKET.head(objectKey);
-      if (!head) {
-        return jsonResp({ error: "Private screening master not yet uploaded." }, 404, cors);
-      }
-
-      const rangeHeader = request.headers.get("Range");
-      const range = parseRange(rangeHeader, head.size);
-      if (range) {
-        const obj = await env.FILM_BUCKET.get(objectKey, {
-          range: { offset: range.offset, length: range.length },
-        });
+      // Storage Path A: Cloudflare R2 Bucket (if bound)
+      if (env.FILM_BUCKET) {
+        const objectKey = env.PRIVATE_VIDEO_KEY || "who-gives-a-damn-master.mp4";
+        const head = await env.FILM_BUCKET.head(objectKey);
+        if (!head) {
+          return jsonResp({ error: "Private screening master not yet uploaded." }, 404, cors);
+        }
+        if (request.method === "HEAD") {
+          return new Response(null, {
+            status: 200,
+            headers: {
+              ...cors,
+              "Content-Type": "video/mp4",
+              "Accept-Ranges": "bytes",
+              "Content-Length": String(head.size),
+              "Cache-Control": "private, no-store",
+            },
+          });
+        }
+        const range = parseRange(request.headers.get("Range"), head.size);
+        if (range) {
+          const obj = await env.FILM_BUCKET.get(objectKey, {
+            range: { offset: range.offset, length: range.length },
+          });
+          return new Response(obj.body, {
+            status: 206,
+            headers: {
+              ...cors,
+              "Content-Type": "video/mp4",
+              "Accept-Ranges": "bytes",
+              "Content-Length": String(range.length),
+              "Content-Range": `bytes ${range.offset}-${range.end}/${head.size}`,
+              "Cache-Control": "private, no-store",
+            },
+          });
+        }
+        const obj = await env.FILM_BUCKET.get(objectKey);
         return new Response(obj.body, {
-          status: 206,
+          status: 200,
           headers: {
             ...cors,
             "Content-Type": "video/mp4",
             "Accept-Ranges": "bytes",
-            "Content-Length": String(range.length),
-            "Content-Range": `bytes ${range.offset}-${range.end}/${head.size}`,
+            "Content-Length": String(head.size),
             "Cache-Control": "private, no-store",
           },
         });
       }
 
-      const obj = await env.FILM_BUCKET.get(objectKey);
-      return new Response(obj.body, {
-        status: 200,
-        headers: {
-          ...cors,
-          "Content-Type": "video/mp4",
-          "Accept-Ranges": "bytes",
-          "Content-Length": String(head.size),
-          "Cache-Control": "private, no-store",
-        },
-      });
+      // Storage Path B: Worker-Gated Private Chunks (`run_worker_first = true`)
+      if (env.PRIVATE_ASSETS) {
+        const totalSize = Number(env.PRIVATE_VIDEO_BYTES || 598400575);
+        const chunkSize = Number(env.PRIVATE_CHUNK_BYTES || 4194304);
+        const chunkCount = Math.ceil(totalSize / chunkSize);
+
+        if (request.method === "HEAD") {
+          return new Response(null, {
+            status: 200,
+            headers: {
+              ...cors,
+              "Content-Type": "video/mp4",
+              "Accept-Ranges": "bytes",
+              "Content-Length": String(totalSize),
+              "Cache-Control": "private, no-store",
+            },
+          });
+        }
+
+        const range = parseRange(request.headers.get("Range"), totalSize);
+        if (range) {
+          const chunkIdx = Math.floor(range.offset / chunkSize);
+          const chunkStartByte = chunkIdx * chunkSize;
+          const chunkEndByte = Math.min(totalSize - 1, chunkStartByte + chunkSize - 1);
+          const clampedEnd = Math.min(range.end, chunkEndByte);
+          const sliceOffset = range.offset - chunkStartByte;
+          const sliceLength = clampedEnd - range.offset + 1;
+
+          const chunkName = String(chunkIdx).padStart(3, "0");
+          const assetRes = await env.PRIVATE_ASSETS.fetch(new Request(`https://private.internal/v1/chunk_${chunkName}.bin`));
+          if (!assetRes.ok) {
+            return jsonResp({ error: "Private video segment unavailable." }, 404, cors);
+          }
+          const buf = new Uint8Array(await assetRes.arrayBuffer());
+          const bodySlice = buf.subarray(sliceOffset, sliceOffset + sliceLength);
+          return new Response(bodySlice, {
+            status: 206,
+            headers: {
+              ...cors,
+              "Content-Type": "video/mp4",
+              "Accept-Ranges": "bytes",
+              "Content-Length": String(bodySlice.byteLength),
+              "Content-Range": `bytes ${range.offset}-${clampedEnd}/${totalSize}`,
+              "Cache-Control": "private, no-store",
+            },
+          });
+        }
+
+        // Full sequential stream if client omits Range header
+        const { readable, writable } = new TransformStream();
+        const writer = writable.getWriter();
+        (async () => {
+          try {
+            for (let i = 0; i < chunkCount; i++) {
+              const chunkName = String(i).padStart(3, "0");
+              const r = await env.PRIVATE_ASSETS.fetch(new Request(`https://private.internal/v1/chunk_${chunkName}.bin`));
+              if (!r.ok) break;
+              const ab = await r.arrayBuffer();
+              await writer.write(new Uint8Array(ab));
+            }
+            await writer.close();
+          } catch (err) {
+            await writer.abort(err);
+          }
+        })();
+
+        return new Response(readable, {
+          status: 200,
+          headers: {
+            ...cors,
+            "Content-Type": "video/mp4",
+            "Accept-Ranges": "bytes",
+            "Content-Length": String(totalSize),
+            "Cache-Control": "private, no-store",
+          },
+        });
+      }
+
+      return jsonResp({ error: "Private storage binding not configured." }, 503, cors);
     }
 
+    // Explicitly block all other routes (including any direct `/v1/chunk_*.bin` paths)
     return jsonResp({ error: "Not found" }, 404, cors);
   },
 };

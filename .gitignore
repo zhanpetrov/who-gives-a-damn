@@ -1,0 +1,8 @@
+.DS_Store
+._*
+node_modules/
+.wrangler/
+.env
+.dev.vars
+worker/.private_assets/
+.private_assets/

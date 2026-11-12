@@ -3,23 +3,33 @@ main = "index.js"
 compatibility_date = "2026-11-01"
 
 [vars]
-STRIPE_MODE = "pending"
+STRIPE_MODE = "live_pending_stripe_auth"
 CHECKOUT_ENABLED = "false"
+STRIPE_CURRENCY = "usd"
+STRIPE_UNIT_AMOUNT = "200"
+STRIPE_DISPLAY_PRICE = "$2"
 PUBLIC_SITE_URL = "https://zhanpetrov.github.io/who-gives-a-damn"
 ALLOWED_ORIGIN = "https://zhanpetrov.github.io"
 PRIVATE_VIDEO_KEY = "who-gives-a-damn-master.mp4"
+PRIVATE_VIDEO_BYTES = "598400575"
+PRIVATE_CHUNK_BYTES = "4194304"
 
-# Bindings provisioned when deploying to Cloudflare:
-# [[kv_namespaces]]
-# binding = "ENTITLEMENTS"
-# id = "<KV_NAMESPACE_ID>"
-#
+[[kv_namespaces]]
+binding = "ENTITLEMENTS"
+id = "b99b0224ac8840228819560d2986b258"
+
+[assets]
+directory = "./.private_assets"
+binding = "PRIVATE_ASSETS"
+run_worker_first = true
+
+# Optional R2 binding if enabled later:
 # [[r2_buckets]]
 # binding = "FILM_BUCKET"
 # bucket_name = "who-gives-a-damn-private"
 #
 # Secrets set via `wrangler secret put` (NEVER stored in repo):
-# - STRIPE_SECRET_KEY
-# - STRIPE_PRICE_ID
-# - STRIPE_WEBHOOK_SECRET
 # - PLAYBACK_SIGNING_SECRET
+# - STRIPE_SECRET_KEY
+# - STRIPE_WEBHOOK_SECRET
+# - STRIPE_PRICE_ID (optional; falls back to $2.00 USD / 200 cents inline Checkout price_data)

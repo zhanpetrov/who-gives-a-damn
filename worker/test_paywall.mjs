@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Automated Test-Mode Verification Suite for "WHO GIVES A DAMN?" Paywall & Private Streaming
+ * Automated Test-Mode Verification Suite for "WHO GIVES A DAMN?" ($2.00 USD Paywall & Private Streaming)
  * Verifies:
- *  1. Pending live checkout protection when price/currency are unconfirmed (no live charges).
- *  2. Test-mode hosted Checkout session creation + cryptographically signed webhook fulfillment.
+ *  1. Pending live checkout protection when Stripe secret is not yet bound (no live charges).
+ *  2. Test-mode $2.00 USD (200 cents) hosted Checkout session creation + signed webhook fulfillment.
  *  3. Checkout cancellation / unpaid session rejection (403, zero playback URL leak).
  *  4. Webhook retry idempotency (multiple replays fulfill exactly once).
  *  5. Forged / expired webhook signature rejection (400).
- *  6. Unauthorized, tampered, and expired private video playback rejection (401/403) + valid 206 Range playback.
+ *  6. Worker-gated private video chunk Range playback (206 Partial Content) + direct `/v1/chunk_000.bin` 404 isolation.
+ *  7. Unauthorized, tampered, and expired private video playback rejection (401/403).
  */
 
 import assert from "node:assert/strict";
@@ -31,21 +32,20 @@ class MemoryKV {
   }
 }
 
-class MemoryPrivateR2 {
-  constructor(bytes) {
+class MemoryPrivateAssets {
+  constructor(bytes, chunkSize = 32) {
     this.bytes = bytes;
+    this.chunkSize = chunkSize;
   }
-  async head(key) {
-    if (key !== "who-gives-a-damn-master.mp4") return null;
-    return { size: this.bytes.byteLength };
-  }
-  async get(key, opts) {
-    if (key !== "who-gives-a-damn-master.mp4") return null;
-    if (opts?.range) {
-      const slice = this.bytes.subarray(opts.range.offset, opts.range.offset + opts.range.length);
-      return { body: slice };
-    }
-    return { body: this.bytes };
+  async fetch(req) {
+    const u = new URL(req.url);
+    const m = u.pathname.match(/^\/v1\/chunk_(\d+)\.bin$/);
+    if (!m) return new Response("Not found", { status: 404 });
+    const idx = Number(m[1]);
+    const start = idx * this.chunkSize;
+    if (start >= this.bytes.byteLength) return new Response("Not found", { status: 404 });
+    const slice = this.bytes.subarray(start, Math.min(this.bytes.byteLength, start + this.chunkSize));
+    return new Response(slice, { status: 200 });
   }
 }
 
@@ -56,15 +56,19 @@ function signStripePayload(rawBody, secret, tsSec = Math.floor(Date.now() / 1000
 
 async function runSuite() {
   const results = [];
-  const sampleVideoBytes = Buffer.from("000000186674797069736f6dPRIVATE_MASTER_VIDEO_STREAM_PAYLOAD", "utf8");
+  const sampleVideoBytes = Buffer.from(
+    "000000186674797069736f6dPRIVATE_MASTER_VIDEO_STREAM_PAYLOAD_200_CENTS_USD",
+    "utf8"
+  );
 
-  // Mock Stripe /v1/checkout/sessions endpoint in test mode (zero network / zero live charge)
+  // Mock Stripe /v1/checkout/sessions endpoint in test mode (verifies exact $2.00 USD / 200 cents)
   const origFetch = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
     if (String(url).endsWith("/v1/checkout/sessions")) {
-      const bodyStr = String(init?.body || "");
+      const bodyStr = decodeURIComponent(String(init?.body || ""));
       assert.match(bodyStr, /mode=payment/);
-      assert.match(bodyStr, /price_test_wgad_001/);
+      assert.match(bodyStr, /unit_amount\]=200/);
+      assert.match(bodyStr, /currency\]=usd/);
       return new Response(
         JSON.stringify({
           id: "cs_test_a1B2c3D4e5F6g7H8i9J0",
@@ -77,42 +81,57 @@ async function runSuite() {
   };
 
   const kv = new MemoryKV();
-  const r2 = new MemoryPrivateR2(sampleVideoBytes);
+  const privateAssets = new MemoryPrivateAssets(sampleVideoBytes, 32);
 
-  // Ephemeral random test-only secrets generated in memory (never real credentials)
   const ephemeralWebhookSecret = "whsec_test_" + crypto.randomBytes(16).toString("hex");
   const ephemeralPlaybackSecret = "play_test_" + crypto.randomBytes(16).toString("hex");
 
   const pendingEnv = {
-    STRIPE_MODE: "pending",
+    STRIPE_MODE: "live_pending_stripe_auth",
     CHECKOUT_ENABLED: "false",
+    STRIPE_UNIT_AMOUNT: "200",
+    STRIPE_CURRENCY: "usd",
+    STRIPE_DISPLAY_PRICE: "$2",
+    PLAYBACK_SIGNING_SECRET: ephemeralPlaybackSecret,
     ENTITLEMENTS: kv,
-    FILM_BUCKET: r2,
+    PRIVATE_ASSETS: privateAssets,
   };
 
-  // Test 1: Live/pending safety gate blocks checkout when price/currency not yet designated
+  // Test 1: Live/pending safety gate blocks checkout until Stripe secret is bound, while reporting $2 & private hosting ready
   {
+    const stRes = await worker.fetch(new Request("https://screening.example/api/status"), pendingEnv);
+    const stData = await stRes.json();
+    assert.equal(stData.price_display, "$2");
+    assert.equal(stData.unit_amount, 200);
+    assert.equal(stData.currency, "usd");
+    assert.equal(stData.private_hosting_ready, true);
+    assert.equal(stData.checkout_ready, false);
+
     const res = await worker.fetch(new Request("https://screening.example/api/checkout", { method: "POST" }), pendingEnv);
     assert.equal(res.status, 503);
     const data = await res.json();
     assert.equal(data.status, "checkout_pending");
-    results.push({ test: "pending_checkout_gate", passed: true, status: res.status });
+    results.push({ test: "pending_checkout_gate_and_2usd_status", passed: true, status: res.status });
   }
 
   const testEnv = {
     STRIPE_MODE: "test",
     CHECKOUT_ENABLED: "true",
     STRIPE_SECRET_KEY: "sk_test_mock_ephemeral",
-    STRIPE_PRICE_ID: "price_test_wgad_001",
+    STRIPE_UNIT_AMOUNT: "200",
+    STRIPE_CURRENCY: "usd",
+    STRIPE_DISPLAY_PRICE: "$2",
     STRIPE_WEBHOOK_SECRET: ephemeralWebhookSecret,
     PLAYBACK_SIGNING_SECRET: ephemeralPlaybackSecret,
     PUBLIC_SITE_URL: "https://zhanpetrov.github.io/who-gives-a-damn",
     STRIPE_API_BASE: "https://mock-stripe.local",
+    PRIVATE_VIDEO_BYTES: String(sampleVideoBytes.byteLength),
+    PRIVATE_CHUNK_BYTES: "32",
     ENTITLEMENTS: kv,
-    FILM_BUCKET: r2,
+    PRIVATE_ASSETS: privateAssets,
   };
 
-  // Test 2: Hosted Checkout Session creation in test mode
+  // Test 2: Hosted $2.00 USD Checkout Session creation in test mode
   let checkoutSessionId = "";
   {
     const res = await worker.fetch(new Request("https://screening.example/api/checkout", { method: "POST" }), testEnv);
@@ -121,7 +140,7 @@ async function runSuite() {
     assert.equal(data.session_id, "cs_test_a1B2c3D4e5F6g7H8i9J0");
     assert.match(data.checkout_url, /^https:\/\/checkout\.stripe\.com\/c\/pay\//);
     checkoutSessionId = data.session_id;
-    results.push({ test: "test_mode_hosted_checkout_create", passed: true });
+    results.push({ test: "test_mode_2usd_hosted_checkout_create", passed: true });
   }
 
   // Test 3: Canceled / unpaid Checkout session cannot access playback URL
@@ -142,7 +161,7 @@ async function runSuite() {
     const fakePayload = JSON.stringify({
       id: "evt_test_forged_1",
       type: "checkout.session.completed",
-      data: { object: { id: checkoutSessionId, payment_status: "paid" } },
+      data: { object: { id: checkoutSessionId, payment_status: "paid", amount_total: 200, currency: "usd" } },
     });
     const res = await worker.fetch(
       new Request("https://screening.example/api/webhook", {
@@ -161,7 +180,7 @@ async function runSuite() {
     const paidEvent = JSON.stringify({
       id: "evt_test_paid_001",
       type: "checkout.session.completed",
-      data: { object: { id: checkoutSessionId, payment_status: "paid" } },
+      data: { object: { id: checkoutSessionId, payment_status: "paid", amount_total: 200, currency: "usd" } },
     });
     const sigHeader = signStripePayload(paidEvent, ephemeralWebhookSecret);
 
@@ -177,7 +196,7 @@ async function runSuite() {
     const d1 = await res1.json();
     assert.equal(d1.idempotent_replay, false);
 
-    // Replay exact same webhook twice (Stripe retry simulation)
+    // Replay exact same webhook (Stripe retry simulation)
     const res2 = await worker.fetch(
       new Request("https://screening.example/api/webhook", {
         method: "POST",
@@ -195,9 +214,12 @@ async function runSuite() {
     results.push({ test: "signed_webhook_fulfillment_and_retry_idempotency", passed: true, entWrites });
   }
 
-  // Test 6: Server-enforced entitlement issues short-lived signed URL & streams HTTP 206 Range bytes
+  // Test 6: Server-enforced entitlement issues short-lived signed URL & streams HTTP 206 Range bytes + blocks direct chunk URL
   let signedStreamUrl = "";
   {
+    const directChunk = await worker.fetch(new Request("https://screening.example/v1/chunk_000.bin"), testEnv);
+    assert.equal(directChunk.status, 404, "Direct private chunk URL must never be publicly accessible");
+
     const res = await worker.fetch(
       new Request(`https://screening.example/api/access?session_id=${checkoutSessionId}`),
       testEnv
@@ -208,6 +230,10 @@ async function runSuite() {
     assert.equal(data.expires_in_seconds, 300);
     signedStreamUrl = data.playback_url;
 
+    const headRes = await worker.fetch(new Request(signedStreamUrl, { method: "HEAD" }), testEnv);
+    assert.equal(headRes.status, 200);
+    assert.equal(headRes.headers.get("Accept-Ranges"), "bytes");
+
     const streamRes = await worker.fetch(
       new Request(signedStreamUrl, { headers: { Range: "bytes=0-15" } }),
       testEnv
@@ -216,22 +242,20 @@ async function runSuite() {
     assert.equal(streamRes.headers.get("Cache-Control"), "private, no-store");
     const chunk = Buffer.from(await streamRes.arrayBuffer());
     assert.equal(chunk.length, 16);
-    results.push({ test: "authorized_short_lived_range_playback", passed: true, status: streamRes.status });
+    assert.equal(chunk.toString("utf8"), sampleVideoBytes.subarray(0, 16).toString("utf8"));
+    results.push({ test: "authorized_short_lived_range_playback_and_chunk_isolation", passed: true, status: streamRes.status });
   }
 
   // Test 7: Unauthorized / tampered / expired playback URLs rejected (zero video bytes leaked)
   {
-    // Direct unsigned request
     const rUnsigned = await worker.fetch(new Request("https://screening.example/api/stream"), testEnv);
     assert.equal(rUnsigned.status, 401);
 
-    // Tampered signature
     const tampered = new URL(signedStreamUrl);
     tampered.searchParams.set("sig", "0".repeat(64));
     const rTampered = await worker.fetch(new Request(tampered.toString()), testEnv);
     assert.equal(rTampered.status, 403);
 
-    // Expired signature
     const expiredExp = Math.floor(Date.now() / 1000) - 10;
     const expiredSig = crypto
       .createHmac("sha256", ephemeralPlaybackSecret)
@@ -253,9 +277,9 @@ async function runSuite() {
   const outPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../qa/stripe_paywall_test_report.json");
   fs.writeFileSync(
     outPath,
-    JSON.stringify({ verified_at: new Date().toISOString(), all_passed: true, tests: results }, null, 2)
+    JSON.stringify({ verified_at: new Date().toISOString(), price_usd: "$2.00", all_passed: true, tests: results }, null, 2)
   );
-  console.log("ALL 7 STRIPE PAYWALL & SIGNED STREAMING SECURITY CHECKS PASSED.");
+  console.log("ALL 7 STRIPE ($2.00 USD) PAYWALL & SIGNED PRIVATE STREAMING SECURITY CHECKS PASSED.");
 }
 
 runSuite().catch((err) => {
