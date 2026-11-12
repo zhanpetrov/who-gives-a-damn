@@ -36,36 +36,27 @@
         <p class="hero__subquestion">The question isn’t who boarded the plane. It’s who signed off.</p>
       </div>
 
-      <div class="vf-gate" id="film-gate">
-        <span class="vf-corner vf-corner--tl" aria-hidden="true"></span>
-        <span class="vf-corner vf-corner--tr" aria-hidden="true"></span>
-        <span class="vf-corner vf-corner--bl" aria-hidden="true"></span>
-        <span class="vf-corner vf-corner--br" aria-hidden="true"></span>
-        <div class="vf-hud-top" aria-hidden="true">
-          <span>16:9 &middot; 24.00 FPS &middot; STEREO</span>
-          <span>50 PICTURE EVENTS &middot; AI-GENERATED ILLUSTRATION</span>
-        </div>
-        <img
-          class="vf-gate__img"
-          src="assets/cover.jpg"
-          alt="Zhan Petrov seated at a dark walnut desk lit by a warm brass lamp in Who Gives a Damn?"
-          width="1280"
-          height="720"
-        />
-        <div class="vf-gate__overlay">
-          <div class="watch-cta-group">
-            <a class="btn-watch" href="watch.html" id="primary-watch-btn">
-              <span aria-hidden="true">&#9654;</span> Watch the film
-            </a>
-            <button class="btn-secondary" type="button" id="toggle-transcript-hero" aria-expanded="false" aria-controls="transcript-panel">
-              Captions &amp; Transcript
-            </button>
-          </div>
-        </div>
-        <div class="vf-embed-slot" id="hero-embed-slot" hidden></div>
+      <div class="vf-gate is-direct-embed" id="film-gate">
+        <iframe
+          class="yt-embed"
+          src="https://www.youtube.com/embed/7Q_azoXi0Jw?rel=0&amp;modestbranding=1"
+          title="WHO GIVES A DAMN? — A Short Film by Zhan Petrov"
+          allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen
+        ></iframe>
+      </div>
+      <div class="watch-cta-group" style="margin-top: 1rem;">
+        <a class="btn-watch" href="#article">Read the Essay</a>
+        <button class="btn-secondary" type="button" id="toggle-transcript-hero" aria-expanded="false" aria-controls="transcript-panel">
+          Captions &amp; Transcript
+        </button>
+        <a class="btn-secondary" href="https://youtu.be/7Q_azoXi0Jw" target="_blank" rel="noopener noreferrer">
+          Watch on YouTube &nearr;
+        </a>
       </div>
       <p class="vf-caption">
-        Playback is strictly user-initiated. Cover frame generated in Google Flow using Zhan Petrov’s authorized likeness.
+        16:9 &middot; 24.00 FPS &middot; 50 Picture Events &middot; Playback is strictly user-initiated.
       </p>
     </section>
 
