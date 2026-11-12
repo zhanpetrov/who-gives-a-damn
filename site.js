@@ -2,6 +2,7 @@
   "use strict";
 
   const cfg = window.WGAD_CONFIG || {};
+  const ytId = cfg.youtubeId || "7Q_azoXi0Jw";
 
   function parseVtt(vttText) {
     const blocks = vttText.replace(/\r\n/g, "\n").split(/\n\n+/);
@@ -88,127 +89,36 @@
     }
   }
 
-  async function initScreeningRoom() {
-    const stage = document.getElementById("player-stage");
-    if (!stage) return;
+  function initHeroYouTubeGate() {
+    const gate = document.getElementById("film-gate");
+    const slot = document.getElementById("hero-embed-slot");
+    const watchBtn = document.getElementById("primary-watch-btn");
+    if (!gate || !slot || !watchBtn) return;
 
-    const gateCard = document.getElementById("gate-card");
-    const gateTag = document.getElementById("gate-tag");
-    const gateTitle = document.getElementById("gate-title");
-    const gateDesc = document.getElementById("gate-desc");
-    const checkoutBtn = document.getElementById("checkout-btn");
-    const player = document.getElementById("private-player");
-    const backdrop = document.getElementById("screening-backdrop");
-    const statusBanner = document.getElementById("screening-status");
-
-    const params = new URLSearchParams(window.location.search);
-    const sessionId = (params.get("session_id") || "").trim();
-    const canceled = params.get("canceled") === "1";
-    const apiBase = (cfg.workerApiBase || "").replace(/\/$/, "");
-    const priceLabel = cfg.priceDisplay || "$2";
-
-    if (canceled) {
-      gateTag.textContent = "Checkout Canceled";
-      gateTitle.textContent = "No Charge Was Made";
-      gateDesc.textContent =
-        "Your Stripe Checkout session was canceled before payment. You can read the complete essay free or start a new $2 screening checkout when ready.";
-      statusBanner.textContent = "Checkout canceled — entitlement not granted.";
+    function mountEmbed() {
+      if (gate.classList.contains("is-playing")) return;
+      gate.classList.add("is-playing");
+      slot.removeAttribute("hidden");
+      const iframe = document.createElement("iframe");
+      iframe.className = "yt-embed";
+      iframe.src = `https://www.youtube.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0&modestbranding=1`;
+      iframe.title = "WHO GIVES A DAMN? — A Short Film by Zhan Petrov";
+      iframe.allow =
+        "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+      iframe.referrerPolicy = "strict-origin-when-cross-origin";
+      iframe.allowFullscreen = true;
+      slot.innerHTML = "";
+      slot.appendChild(iframe);
     }
 
-    // If returning from Stripe Checkout with ?session_id=cs_..., verify server-side entitlement
-    if (sessionId && apiBase) {
-      statusBanner.textContent = "Verifying confirmed payment entitlement with screening server…";
-      checkoutBtn.disabled = true;
-      try {
-        const res = await fetch(`${apiBase}/api/access?session_id=${encodeURIComponent(sessionId)}`);
-        const data = await res.json();
-        if (res.ok && data.authorized && data.playback_url) {
-          gateCard.hidden = true;
-          if (backdrop) backdrop.hidden = true;
-          player.hidden = false;
-          player.src = data.playback_url;
-          // Keep playback strictly user-initiated (do NOT call player.play() automatically)
-          statusBanner.textContent =
-            "Entitlement verified. Short-lived signed stream loaded — press Play when ready.";
-          return;
-        }
-        gateTag.textContent = "Access Not Authorized";
-        gateTitle.textContent = "Payment Verification Required";
-        gateDesc.textContent =
-          data.error || "This session does not have a confirmed payment entitlement.";
-        statusBanner.textContent = "Playback blocked: valid server-side Stripe entitlement required.";
-        checkoutBtn.disabled = false;
-      } catch {
-        statusBanner.textContent = "Unable to reach entitlement server.";
-        checkoutBtn.disabled = false;
-      }
-    }
-
-    // Probe live Worker `/api/status` so live Stripe activation flips Checkout ON immediately
-    let serverCheckoutReady = Boolean(cfg.checkoutEnabled);
-    let serverMode = cfg.mode || "live_pending";
-    if (apiBase) {
-      try {
-        const stRes = await fetch(`${apiBase}/api/status`);
-        if (stRes.ok) {
-          const stData = await stRes.json();
-          if (typeof stData.checkout_ready === "boolean") {
-            serverCheckoutReady = stData.checkout_ready;
-          }
-          if (stData.mode) serverMode = stData.mode;
-        }
-      } catch {
-        // Keep static fallback if offline
-      }
-    }
-
-    if (!serverCheckoutReady || !apiBase) {
-      if (!canceled) {
-        gateTag.textContent = `Screening Pass · ${priceLabel} USD`;
-        gateTitle.textContent = `Digital Screening Pass — ${priceLabel}`;
-        gateDesc.textContent =
-          cfg.pendingMessage ||
-          "Private 1080p video hosting and signed Cloudflare playback are live; hosted $2.00 USD Stripe Checkout activates once Stripe 2FA sign-in completes.";
-        statusBanner.textContent =
-          "Private 1080p hosting & Cloudflare Worker live · $2.00 USD Checkout awaiting Stripe 2FA key binding (zero charges active).";
-      }
-      checkoutBtn.textContent = `Watch the Film — ${priceLabel} (Activating Stripe)`;
-      checkoutBtn.disabled = true;
-      checkoutBtn.style.opacity = "0.65";
-      checkoutBtn.style.cursor = "not-allowed";
-      return;
-    }
-
-    checkoutBtn.disabled = false;
-    checkoutBtn.style.opacity = "1";
-    checkoutBtn.style.cursor = "pointer";
-    checkoutBtn.textContent = `Watch the Film — ${priceLabel}`;
-    statusBanner.textContent =
-      serverMode === "preview_test" || serverMode === "test"
-        ? `Mode: Stripe Test-Mode Hosted Checkout (${priceLabel} USD — no real card charges).`
-        : `Hosted Stripe Checkout ready (${priceLabel}.00 USD Screening Pass).`;
-
-    checkoutBtn.addEventListener("click", async () => {
-      checkoutBtn.disabled = true;
-      statusBanner.textContent = `Opening hosted ${priceLabel} Stripe Checkout…`;
-      try {
-        const res = await fetch(`${apiBase}/api/checkout`, { method: "POST" });
-        const data = await res.json();
-        if (res.ok && data.checkout_url) {
-          window.location.assign(data.checkout_url);
-          return;
-        }
-        statusBanner.textContent = data.error || "Checkout is currently paused.";
-        checkoutBtn.disabled = false;
-      } catch {
-        statusBanner.textContent = "Could not connect to Checkout endpoint.";
-        checkoutBtn.disabled = false;
-      }
+    watchBtn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      mountEmbed();
     });
   }
 
   document.addEventListener("DOMContentLoaded", () => {
     initTranscriptDrawer();
-    initScreeningRoom();
+    initHeroYouTubeGate();
   });
 })();

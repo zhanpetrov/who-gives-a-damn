@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Screening Room — WHO GIVES A DAMN? · Zhan Petrov</title>
-  <meta name="description" content="Digital screening room for Zhan Petrov's satirical editorial short film WHO GIVES A DAMN?" />
+  <title>Screening Room — WHO GIVES A DAMN? &middot; Zhan Petrov</title>
+  <meta name="description" content="Watch Zhan Petrov's five-minute satirical editorial short film WHO GIVES A DAMN?" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&amp;display=swap" rel="stylesheet" />
@@ -15,64 +15,36 @@
     <a class="site-nav__brand" href="index.html">&larr; Back to Essay &amp; Dossier</a>
     <nav class="site-nav__links" aria-label="Screening navigation">
       <a href="index.html#article">Read Essay</a>
-      <a href="index.html#transcript">Transcript</a>
+      <a href="index.html#transcript">Captions &amp; Transcript</a>
       <a href="index.html#sources">Sources</a>
     </nav>
   </header>
 
   <main class="screening-shell">
-    <p class="hero__kicker">Private Digital Screening Room · User-Initiated Playback</p>
+    <p class="hero__kicker">Digital Screening Room &middot; 05:00 &middot; 50 Shots</p>
     <h1 class="article-headline" style="color: var(--chalk); margin-bottom: 1.2rem;">Who Gives a Damn?</h1>
 
     <div class="player-stage" id="player-stage">
-      <img
-        class="vf-gate__img"
-        id="screening-backdrop"
-        src="assets/cover.jpg"
-        alt="Cover frame of Who Gives a Damn?"
-        style="position: absolute; inset: 0; opacity: 0.28; pointer-events: none;"
-      />
-
-      <div class="gate-card" id="gate-card">
-        <p class="gate-card__tag" id="gate-tag">Screening Pass &middot; $2 USD</p>
-        <h2 class="gate-card__title" id="gate-title">Digital Screening Pass &mdash; $2</h2>
-        <p class="gate-card__desc" id="gate-desc">
-          Private 1080p high-definition stream with synchronized English captions, delivered via short-lived signed playback after confirmed $2.00 USD Stripe Checkout.
-        </p>
-        <div class="watch-cta-group">
-          <button class="btn-watch" type="button" id="checkout-btn">
-            Watch the Film &mdash; $2
-          </button>
-          <a class="btn-secondary" href="index.html#article">Read the Complete Essay</a>
-        </div>
-      </div>
-
-      <video
-        id="private-player"
-        controls
-        preload="none"
-        playsinline
-        poster="assets/cover.jpg"
-        hidden
-      >
-        <track
-          kind="captions"
-          src="assets/captions.vtt"
-          srclang="en"
-          label="English"
-          default
-        />
-      </video>
+      <iframe
+        class="yt-embed"
+        src="https://www.youtube.com/embed/7Q_azoXi0Jw?rel=0&amp;modestbranding=1"
+        title="WHO GIVES A DAMN? — A Short Film by Zhan Petrov"
+        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerpolicy="strict-origin-when-cross-origin"
+        allowfullscreen
+      ></iframe>
     </div>
 
-    <div class="status-banner" id="screening-status" role="status" aria-live="polite">
-      Checking screening configuration…
+    <div class="watch-cta-group" style="margin-top: 1.25rem;">
+      <a class="btn-secondary" href="index.html#article">Read the Complete Essay</a>
+      <a class="btn-secondary" href="index.html#transcript">Captions &amp; Synchronized Transcript</a>
+      <a class="btn-secondary" href="https://youtu.be/7Q_azoXi0Jw" target="_blank" rel="noopener noreferrer">Open on YouTube &nearr;</a>
     </div>
   </main>
 
   <footer class="site-footer">
     <span>&copy; 2026 Zhan Petrov</span>
-    <span>Short-lived HMAC-signed private stream · Zero client-side keys or exposed URLs</span>
+    <span>WHO GIVES A DAMN? &middot; 16:9 &middot; 24.00 FPS &middot; Stereo</span>
   </footer>
 
   <script src="config.js"></script>

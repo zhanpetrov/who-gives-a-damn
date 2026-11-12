@@ -3,12 +3,12 @@
 Single-film release site and editorial dossier by **Zhan Petrov**.
 
 - **Title:** *WHO GIVES A DAMN?*
-- **Format:** 16:9 · 24.00 fps · 50 Picture Events · ~5:00
+- **Format:** 16:9 · 24.00 fps · 50 Picture Events · 05:00
 - **Live Site:** `https://zhanpetrov.github.io/who-gives-a-damn/`
+- **YouTube Film:** `https://youtu.be/7Q_azoXi0Jw`
 
 ## Structure
 
-- `index.html` — Minimalist single-film editorial page featuring the viewfinder cover frame, user-initiated screening link, complete fact-checked article, timecoded captions & transcript drawer, AI production disclosure, and primary source ledger.
-- `watch.html` — Dedicated digital screening room enforcing server-verified Stripe Checkout entitlement and short-lived HMAC-signed private streaming.
-- `config.live.js` / `config.preview.js` / `config.js` — Separate deployable live (pending final pricing) and preview (Stripe test-mode) configurations with zero client-side secrets or exposed media URLs.
-- `worker/` — Server-side Cloudflare Worker implementing hosted Stripe Checkout, cryptographic `Stripe-Signature` webhook verification, idempotent entitlement fulfillment, and short-lived signed HTTP 206 Range streaming from private R2 storage.
+- `index.html` — Minimalist single-film editorial page featuring the viewfinder cover frame with click-to-play embedded YouTube screening, complete fact-checked article, timecoded captions & transcript drawer, AI production disclosure, and primary source ledger.
+- `watch.html` — Dedicated 16:9 digital screening room with embedded YouTube playback (`7Q_azoXi0Jw`).
+- `config.js` / `site.js` / `styles.css` — User-initiated YouTube embed and synchronized WebVTT transcript viewer.

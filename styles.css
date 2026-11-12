@@ -492,11 +492,28 @@ a {
   overflow: hidden;
 }
 
-.player-stage video {
+.player-stage video,
+.player-stage .yt-embed,
+.vf-embed-slot,
+.vf-embed-slot .yt-embed {
   width: 100%;
   height: 100%;
+  border: 0;
   display: block;
   background: #000;
+}
+
+.vf-embed-slot {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+}
+
+.vf-gate.is-playing .vf-gate__img,
+.vf-gate.is-playing .vf-gate__overlay,
+.vf-gate.is-playing .vf-hud-top,
+.vf-gate.is-playing .vf-corner {
+  display: none !important;
 }
 
 .gate-card {
@@ -557,6 +574,10 @@ a {
     aspect-ratio: auto;
     min-height: 265px;
   }
+  .vf-gate.is-playing {
+    aspect-ratio: 16 / 9;
+    min-height: 0;
+  }
   .vf-gate__img {
     position: absolute;
     inset: 0;
@@ -585,16 +606,9 @@ a {
     padding: 0.76rem 1rem;
   }
   .player-stage {
-    aspect-ratio: auto;
-    min-height: 340px;
-    padding: 1.15rem;
-  }
-  .gate-card {
-    width: 100%;
-    padding: 1.3rem;
-  }
-  .gate-card__title {
-    font-size: 1.65rem;
+    aspect-ratio: 16 / 9;
+    min-height: 0;
+    padding: 0;
   }
   .sources-grid {
     grid-template-columns: minmax(0, 1fr);

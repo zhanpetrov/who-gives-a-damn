@@ -18,7 +18,7 @@
   <header class="site-nav">
     <a class="site-nav__brand" href="index.html">Zhan Petrov · Editorial Film</a>
     <nav class="site-nav__links" aria-label="Primary">
-      <a href="watch.html">Watch the Film &middot; $2</a>
+      <a href="watch.html">Watch the Film</a>
       <a href="#article">Read the Essay</a>
       <a href="#transcript">Captions &amp; Transcript</a>
       <a href="#sources">Sources</a>
@@ -36,7 +36,7 @@
         <p class="hero__subquestion">The question isn’t who boarded the plane. It’s who signed off.</p>
       </div>
 
-      <div class="vf-gate">
+      <div class="vf-gate" id="film-gate">
         <span class="vf-corner vf-corner--tl" aria-hidden="true"></span>
         <span class="vf-corner vf-corner--tr" aria-hidden="true"></span>
         <span class="vf-corner vf-corner--bl" aria-hidden="true"></span>
@@ -55,13 +55,14 @@
         <div class="vf-gate__overlay">
           <div class="watch-cta-group">
             <a class="btn-watch" href="watch.html" id="primary-watch-btn">
-              <span aria-hidden="true">&#9654;</span> Watch the film &middot; $2
+              <span aria-hidden="true">&#9654;</span> Watch the film
             </a>
             <button class="btn-secondary" type="button" id="toggle-transcript-hero" aria-expanded="false" aria-controls="transcript-panel">
               Captions &amp; Transcript
             </button>
           </div>
         </div>
+        <div class="vf-embed-slot" id="hero-embed-slot" hidden></div>
       </div>
       <p class="vf-caption">
         Playback is strictly user-initiated. Cover frame generated in Google Flow using Zhan Petrov’s authorized likeness.
