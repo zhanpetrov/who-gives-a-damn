@@ -1,0 +1,25 @@
+name = "who-gives-a-damn-screening"
+main = "index.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+STRIPE_MODE = "pending"
+CHECKOUT_ENABLED = "false"
+PUBLIC_SITE_URL = "https://zhanpetrov.github.io/who-gives-a-damn"
+ALLOWED_ORIGIN = "https://zhanpetrov.github.io"
+PRIVATE_VIDEO_KEY = "who-gives-a-damn-master.mp4"
+
+# Bindings provisioned when deploying to Cloudflare:
+# [[kv_namespaces]]
+# binding = "ENTITLEMENTS"
+# id = "<KV_NAMESPACE_ID>"
+#
+# [[r2_buckets]]
+# binding = "FILM_BUCKET"
+# bucket_name = "who-gives-a-damn-private"
+#
+# Secrets set via `wrangler secret put` (NEVER stored in repo):
+# - STRIPE_SECRET_KEY
+# - STRIPE_PRICE_ID
+# - STRIPE_WEBHOOK_SECRET
+# - PLAYBACK_SIGNING_SECRET

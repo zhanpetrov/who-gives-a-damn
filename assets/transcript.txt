@@ -1,0 +1,46 @@
+WHO GIVES A DAMN?
+By Zhan Petrov
+
+Who gives a damn?
+
+Who sleeps with whom?
+
+Air Force One was headed for Beijing in May when Marco Rubio told Donald Trump that U.S. intelligence had linked NVIDIA’s CEO to a suspected Chinese spy. That’s what The New York Times and The Washington Post reported.
+
+The plane stopped for fuel in Anchorage. Jensen Huang got on.
+
+Six months later, a reporter asked Trump if he knew about it at the time. “No, I didn’t hear about it then,” he said.
+
+According to the Times, Rubio’s warning was at least the second time Trump had been briefed.
+
+Apparently the president’s memory had a longer layover than the plane.
+
+The Times also reported a separate relationship between Huang and an NVIDIA executive who reported directly to him.
+
+Alice Huang had been an executive at Singapore-based chip buyer Megaspeed.
+
+The Times and the Post reported that U.S. intelligence concluded she worked for Beijing—an allegation China’s foreign ministry rejected.
+
+The Information, citing people who know her, an NVIDIA China sales employee, and corporate records, reported that her relationship with Jensen Huang helped get at least $7.5 billion worth of NVIDIA chips through intermediaries to Chinese firms.
+
+NVIDIA’s board said on November 8, when it opened its inquiry, that it had no reason to believe national security or NVIDIA secrets were compromised. Fine.
+
+Who signed off on the shipments?
+
+Where did the chips go? What did NVIDIA tell investors about the customer?
+
+On Wednesday, November 11, The Wall Street Journal and Reuters reported that NVIDIA’s board was preparing to oust Huang. As of early November 12, the company had yet to announce a final decision.
+
+The stock fell more than 8 percent in Wednesday’s after-hours trading.
+
+Now consider a hypothetical scenario: a 30 percent crash across the wider market would take a much bigger chain reaction—say, a hypothetical pullback where a cloud company pushes its next chip order into next year, and a lender demands actual revenue before funding another data center.
+
+That’s how a boardroom scandal could start to look like the dot-com bust.
+
+Meanwhile, Wall Street spent Wednesday evening, November 11, dumping NVIDIA. On Thursday, November 19, if the IPO goes ahead as scheduled, it gets to buy Anthropic.
+
+Read the November 10 prospectus before you call that a change of heart. At the assumed midpoint price, NVIDIA itself has agreed to buy about $10 billion of non-voting Anthropic stock in a concurrent private placement contingent on the IPO.
+
+The board can show Jensen Huang the door.
+
+Somebody still has to sign the check.
