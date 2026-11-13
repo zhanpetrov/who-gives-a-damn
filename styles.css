@@ -333,22 +333,44 @@ a {
   line-height: 1.74;
   margin: 0 0 1.45rem;
   color: var(--ink);
+  overflow-wrap: break-word;
 }
 
 .editorial-body p.lead-stanza {
   font-size: clamp(1.32rem, 2.8vw, 1.62rem);
   line-height: 1.38;
   font-weight: 600;
+  margin: 1.55rem 0 1.65rem;
+}
+
+.editorial-body p.lead-stanza:has(+ p.lead-stanza) {
   margin-bottom: 0.55rem;
 }
 
 .editorial-body p.lead-stanza + p.lead-stanza {
+  margin-top: 0;
   margin-bottom: 1.85rem;
 }
 
 .editorial-body p.closing-stanza {
   font-weight: 600;
   padding-top: 0.5rem;
+}
+
+.editorial-body a {
+  color: var(--ink);
+  text-decoration-line: underline;
+  text-decoration-color: rgba(185, 56, 41, 0.5);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  transition: color 0.16s ease, text-decoration-color 0.16s ease, background-color 0.16s ease;
+}
+
+.editorial-body a:hover,
+.editorial-body a:focus-visible {
+  color: var(--signal-red);
+  text-decoration-color: var(--signal-red);
+  background-color: rgba(185, 56, 41, 0.06);
 }
 
 /* Ledger / Transcript / Disclosure / Sources Footer Sections (Outside Article Body) */
